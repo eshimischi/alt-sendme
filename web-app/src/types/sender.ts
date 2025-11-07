@@ -1,3 +1,12 @@
+export enum SenderStatus {
+  IDLE = 'IDLE',
+  FILE_SELECTED = 'FILE_SELECTED',
+  WAITING_FOR_RECEIVER = 'WAITING_FOR_RECEIVER',
+  TRANSFERRING = 'TRANSFERRING',
+  TRANSFER_COMPLETE = 'TRANSFER_COMPLETE',
+  TRANSFER_STOPPED = 'TRANSFER_STOPPED'
+}
+
 export interface TransferMetadata {
   fileName: string
   fileSize: number
@@ -15,7 +24,7 @@ export interface TransferProgress {
   percentage: number
 }
 
-export interface SuccessScreenProps {
+export interface TransferResultScreenProps {
   metadata: TransferMetadata
   onDone: () => void
   wasStopped?: boolean

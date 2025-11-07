@@ -94,9 +94,6 @@ pub async fn download(ticket_str: String, options: ReceiveOptions, app_handle: A
         let local = db.remote().local(hash_and_format).await?;
         
         let (stats, total_files, payload_size) = if !local.is_complete() {
-            // Emit receive-started event
-            emit_event(&app_handle, "receive-started");
-            
             let connection = match endpoint.connect(addr.clone(), iroh_blobs::protocol::ALPN).await {
                 Ok(conn) => conn,
                 Err(e) => {
@@ -179,8 +176,7 @@ pub async fn download(ticket_str: String, options: ReceiveOptions, app_handle: A
             let total_files = local.children().unwrap() - 1;
             let payload_bytes = 0; // todo local.sizes().skip(2).map(Option::unwrap).sum::<u64>();
             
-            // Emit events for already complete data
-            emit_event(&app_handle, "receive-started");
+            // Emit completion for already complete data
             emit_event(&app_handle, "receive-completed");
             
             (Stats::default(), total_files, payload_bytes)

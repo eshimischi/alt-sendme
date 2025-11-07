@@ -77,20 +77,12 @@ export function useReceiver(): UseReceiverReturn {
   }, [])
 
   useEffect(() => {
-    let unlistenStart: UnlistenFn | undefined
     let unlistenProgress: UnlistenFn | undefined
     let unlistenComplete: UnlistenFn | undefined
     let unlistenFileNames: UnlistenFn | undefined
     let progressUpdateTimeout: NodeJS.Timeout | undefined
 
     const setupListeners = async () => {
-      unlistenStart = await listen('receive-started', () => {
-        setIsTransporting(true)
-        setIsCompleted(false)
-        setTransferStartTime(Date.now())
-        setTransferProgress(null)
-      })
-
       unlistenProgress = await listen('receive-progress', (event: any) => {
         try {
           const payload = event.payload as string
@@ -102,6 +94,17 @@ export function useReceiver(): UseReceiverReturn {
             const speedInt = parseInt(parts[2], 10)
             const speedBps = speedInt / 1000.0
             const percentage = totalBytes > 0 ? (bytesTransferred / totalBytes) * 100 : 0
+            
+            // Initialize on first progress event
+            setIsTransporting(prev => {
+              if (!prev && totalBytes > 0) {
+                setIsCompleted(false)
+                setTransferStartTime(Date.now())
+                setTransferProgress(null)
+                return true
+              }
+              return prev
+            })
             
             if (progressUpdateTimeout) {
               clearTimeout(progressUpdateTimeout)
@@ -183,7 +186,6 @@ export function useReceiver(): UseReceiverReturn {
       if (progressUpdateTimeout) {
         clearTimeout(progressUpdateTimeout)
       }
-      if (unlistenStart) unlistenStart()
       if (unlistenProgress) unlistenProgress()
       if (unlistenComplete) unlistenComplete()
       if (unlistenFileNames) unlistenFileNames()

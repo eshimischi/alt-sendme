@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { TicketInput } from './TicketInput'
 import { ReceivingActiveCard } from './ReceivingActiveCard'
 import { PulseAnimation } from '../sender/PulseAnimation'
-import { TransferSuccessScreen } from '../sender/TransferSuccessScreen'
+import { TransferResultScreen } from '../TransferResultScreen'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,7 +81,7 @@ export function Receiver({ onTransferStateChange }: ReceiverProps) {
         </>
       ) : isCompleted && transferMetadata ? (
         <div className="flex-1 flex flex-col">
-          <TransferSuccessScreen 
+          <TransferResultScreen 
             metadata={transferMetadata}
             onDone={resetForNewTransfer}
           />

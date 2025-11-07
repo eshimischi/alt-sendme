@@ -366,13 +366,11 @@ async fn show_provide_progress_with_logging(
                                                     last_emit_time: now,
                                                 }
                                             );
-                                            emit_event(&app_handle_task, "transfer-started");
                                             transfer_started = true;
                                         }
                                     }
                                     iroh_blobs::provider::events::RequestUpdate::Progress(m) => {
                                         if !transfer_started {
-                                            emit_event(&app_handle_task, "transfer-started");
                                             transfer_started = true;
                                         }
                                         
