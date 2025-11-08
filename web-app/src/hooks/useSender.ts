@@ -40,6 +40,8 @@ export function useSender(): UseSenderReturn {
   const [transferStartTime, setTransferStartTime] = useState<number | null>(null)
   const [isStopping, setIsStopping] = useState(false)
   const wasManuallyStoppedRef = useRef(false)
+  const transferActuallyStartedRef = useRef(false)
+  const pendingProgressRef = useRef<TransferProgress | null>(null)
   const [alertDialog, setAlertDialog] = useState<AlertDialogState>({
     isOpen: false,
     title: '',
@@ -63,6 +65,8 @@ export function useSender(): UseSenderReturn {
         setTransferMetadata(null)
         wasManuallyStoppedRef.current = false
         setIsStopping(false)
+        transferActuallyStartedRef.current = true
+        pendingProgressRef.current = null
       })
 
       unlistenProgress = await listen('transfer-progress', (event: any) => {
@@ -77,17 +81,21 @@ export function useSender(): UseSenderReturn {
             const speedBps = speedInt / 1000.0
             const percentage = totalBytes > 0 ? (bytesTransferred / totalBytes) * 100 : 0
             
+            // Store the latest progress in a ref for fast transfers
+            const progress: TransferProgress = {
+              bytesTransferred,
+              totalBytes,
+              speedBps,
+              percentage
+            }
+            pendingProgressRef.current = progress
+            
             if (progressUpdateTimeout) {
               clearTimeout(progressUpdateTimeout)
             }
             
             progressUpdateTimeout = setTimeout(() => {
-              setTransferProgress({
-                bytesTransferred,
-                totalBytes,
-                speedBps,
-                percentage
-              })
+              setTransferProgress(progress)
             }, 100)
           }
         } catch (error) {
@@ -100,13 +108,47 @@ export function useSender(): UseSenderReturn {
           return
         }
         
+        // Only mark as completed if the transfer actually started
+        // This prevents premature completion when only metadata is transferred
+        if (!transferActuallyStartedRef.current) {
+          // Clear any stale progress that might be from metadata transfer
+          pendingProgressRef.current = null
+          return
+        }
+        
+        // Additional safeguard: only proceed if we have a valid transfer start time
+        // This ensures we're completing an actual transfer, not metadata
+        if (!transferStartTime) {
+          pendingProgressRef.current = null
+          return
+        }
+        
+        // For fast transfers, flush any pending progress update before clearing
+        // This ensures the UI shows progress even if transfer completes before timeout
         if (progressUpdateTimeout) {
           clearTimeout(progressUpdateTimeout)
+          progressUpdateTimeout = undefined
+        }
+        
+        // If there's pending progress from the actual transfer, ensure it shows 100% completion
+        // Only flush if we have valid progress data from this transfer session
+        if (pendingProgressRef.current && transferStartTime) {
+          const finalProgress: TransferProgress = {
+            ...pendingProgressRef.current,
+            percentage: 100,
+            bytesTransferred: pendingProgressRef.current.totalBytes
+          }
+          setTransferProgress(finalProgress)
+          // Clear after a brief moment to allow UI to render final progress
+          setTimeout(() => {
+            setTransferProgress(null)
+          }, 100)
+        } else {
+          setTransferProgress(null)
         }
         
         setIsTransporting(false)
         setIsCompleted(true)
-        setTransferProgress(null)
         
         const endTime = Date.now()
         const duration = transferStartTime ? endTime - transferStartTime : 0
@@ -208,6 +250,7 @@ export function useSender(): UseSenderReturn {
     
     try {
       setIsLoading(true)
+      transferActuallyStartedRef.current = false
       const result = await invoke<string>('start_sharing', { path: selectedPath })
       setTicket(result)
       setIsSharing(true)
@@ -256,6 +299,7 @@ export function useSender(): UseSenderReturn {
       
       if (isCompletedTransfer) {
         wasManuallyStoppedRef.current = false
+        transferActuallyStartedRef.current = false
         setIsSharing(false)
         setIsTransporting(false)
         setIsCompleted(false)
@@ -276,6 +320,7 @@ export function useSender(): UseSenderReturn {
       
       if (!wasActiveTransfer || !currentSelectedPath) {
         wasManuallyStoppedRef.current = false
+        transferActuallyStartedRef.current = false
         setIsSharing(false)
         setIsTransporting(false)
         setIsCompleted(false)
