@@ -58,6 +58,12 @@ export function useSender(): UseSenderReturn {
 
     const setupListeners = async () => {
       unlistenStart = await listen('transfer-started', () => {
+        // Clear any pending progress updates
+        if (progressUpdateTimeout) {
+          clearTimeout(progressUpdateTimeout)
+          progressUpdateTimeout = undefined
+        }
+        
         setIsTransporting(true)
         setIsCompleted(false)
         setTransferStartTime(Date.now())
@@ -90,13 +96,21 @@ export function useSender(): UseSenderReturn {
             }
             pendingProgressRef.current = progress
             
-            if (progressUpdateTimeout) {
-              clearTimeout(progressUpdateTimeout)
-            }
-            
-            progressUpdateTimeout = setTimeout(() => {
+            // Use throttling instead of debouncing: update at most every 100ms
+            // but don't reset the timer - this ensures smooth, regular updates
+            if (!progressUpdateTimeout) {
+              // First update: set immediately for immediate feedback
               setTransferProgress(progress)
-            }, 100)
+              
+              progressUpdateTimeout = setTimeout(() => {
+                progressUpdateTimeout = undefined
+                // Flush the latest progress from ref
+                if (pendingProgressRef.current) {
+                  setTransferProgress(pendingProgressRef.current)
+                }
+              }, 100)
+            }
+            // If timeout is already set, just update the ref - the timeout will flush it
           }
         } catch (error) {
           console.error('Failed to parse progress event:', error)
@@ -187,6 +201,7 @@ export function useSender(): UseSenderReturn {
         
         if (progressUpdateTimeout) {
           clearTimeout(progressUpdateTimeout)
+          progressUpdateTimeout = undefined
         }
         
         setIsTransporting(false)
